@@ -1,5 +1,14 @@
 {
-	"files.associations": {
-		"*.css": "tailwindcss"
-	}
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always"
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  },
+  "js/ts.preferences.importModuleSpecifierEnding": "minimal",
+  "js/ts.preferences.importModuleSpecifier": "non-relative"
 }

@@ -4,59 +4,72 @@
   let query = $state("");
   const grouped = $derived(data.data);
 
-   // ✅ Total count
-  const totalCount = $derived(Object.values(grouped)
-    .reduce((sum, arr:any) => sum + arr.length, 0));
+  // ✅ Total count
+  const totalCount = $derived(
+    Object.values(grouped).reduce((sum, arr: any) => sum + arr.length, 0),
+  );
 
   // ✅ Max group ID
-  const maxGroupId = $derived(Math.max(
-      ...Object.keys(grouped).map(Number)
-    ));
-      
+  const maxGroupId = $derived(
+    Math.max(
+      ...Object.keys(grouped)
+        .filter((id) => !isNaN(Number(id)))
+        .map(Number),
+    ),
+  );
 
   // 🔍 Filter groups based on search
-  const filteredGroups = $derived(Object.entries(grouped).filter(([_, items]) => {
-    if (!query) return true;
+  const filteredGroups = $derived(
+    Object.entries(grouped).filter(([_, items]) => {
+      if (!query) return true;
 
-    return items.some((item) =>
-      item.name.toLowerCase().includes(query.toLowerCase())
-    );
-  }));
+      return items.some((item) => item.name.toLowerCase().includes(query.toLowerCase()));
+    }),
+  );
 </script>
 
 <div class="flex justify-center">
-    <div class="flex flex-col gap-2 p-4">
-    
+  <div class="flex flex-col gap-2 p-4">
+    <img alt="logo" src="/logo.svg" class="mb-4" />
+
     <h1 class="text-center w-full font-bold text-xl mb-4">List pendaftaran hewan qurban 1447 H</h1>
 
-    <span class="text-center w-full font-bold text-md mb-4">Total {totalCount} pendaftar - {maxGroupId} ekor sapi</span>
+    <span class="text-center w-full font-bold text-md mb-4"
+      >Total {totalCount} pendaftar - {maxGroupId} ekor sapi</span
+    >
 
     <input
-        type="text"
-        class="mb-4 p-2 w-full border rounded-md"
-        placeholder="Cari nama..."
-        bind:value={query}
+      type="text"
+      class="mb-4 p-2 w-full border rounded-md"
+      placeholder="Cari nama..."
+      bind:value={query}
     />
 
     {#if filteredGroups.length === 0}
-    <p>No results found</p>
+      <p>No results found</p>
     {/if}
 
     {#each filteredGroups as [groupId, data]}
-    {@const isNonCollective = data.some((item) => item.status.includes("Non"))}
-    <div class="mb-4">
-        <h2 class="font-bold">{`🐂 Sapi No. ${groupId}${isNonCollective? " (Non-Kolektif)" : ""}`}</h2>
+      <div class="mb-4">
+        {#if groupId === "-"}
+          <h2 class="font-bold">⏳ Menunggu konfirmasi nomor urut sapi...</h2>
+        {:else}
+          {@const isNonCollective = data.some((item) => item.status.includes("Non"))}
+          <h2 class="font-bold">
+            {`🐂 Sapi No. ${groupId}${isNonCollective ? " (Non-Kolektif)" : ""}`}
+          </h2>
+        {/if}
 
         <ul>
           {#each data as item, i}
-            {#if item.status.includes("Non")}
+            {#if groupId === "-" || item.status.includes("Non")}
               <li>- {item.name}</li>
             {:else}
               <li>{i + 1} - {item.name}</li>
             {/if}
           {/each}
         </ul>
-    </div>
+      </div>
     {/each}
-    </div>
+  </div>
 </div>

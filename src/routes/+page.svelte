@@ -198,7 +198,7 @@
 
 <div class="flex justify-center">
   <div class="flex flex-col gap-2 p-4 max-w-xl w-full">
-    <img alt="logo" src="/logo.svg" class="w-3/5 m-auto mb-4" />
+    <img alt="logo" src="/preview.png" class="w-3/5 m-auto mb-4" />
 
     <h1 class="text-center font-bold text-xl mb-2">List pendaftaran hewan qurban 1447 H</h1>
 
@@ -242,13 +242,15 @@
                 <li>
                   {item.name}
 
-                  {#if item.status.toLowerCase().includes("titip kambing")}
-                    (Titip Kambing)
-                  {:else if item.groupId !== "-"}
-                    Sapi No. {item.groupId} {item.info}
-                  {:else}
-                    (⏳ Menunggu konfirmasi nomor urut sapi...)
-                  {/if}
+                  <span class="ml-2 font-bold">
+                    {#if item.status.toLowerCase().includes("titip kambing")}
+                      (Titip Kambing)
+                    {:else if item.groupId !== "-"}
+                      (Sapi No. {item.groupId} - {item.info})
+                    {:else}
+                      (⏳ Menunggu konfirmasi nomor urut sapi...)
+                    {/if}
+                  </span>
                 </li>
               {/each}
             </ul>

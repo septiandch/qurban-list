@@ -1,313 +1,135 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button";
+  import { filterByName, getDate, getSummary } from "$lib/utils";
+
   let { data } = $props();
 
+  let participant = $derived(data.grouped);
   let query = $state("");
+  let heroEl = $state<HTMLDivElement>();
+  let inputEl = $state<HTMLInputElement>();
 
-  // ✅ Types (same as +page.ts)
-  type DataType = { name: string; status: string };
-  type GroupedData = Record<string, DataType[]>;
-  type CategorizedData = Record<string, GroupedData>;
+  const date = getDate();
+  const summary = $derived(getSummary(data));
 
-  const grouped = $derived<GroupedData>(data.data);
-
-  // 🧠 Map status → category
-  function getCategory(status: string) {
-    const s = status.toLowerCase();
-
-    if (s.includes("non")) return "Sapi Non-Kolektif";
-    if (s.includes("kolektif")) return "Sapi Kolektif";
-    if (s.includes("titip kambing")) return "Titip Kambing";
-    if (s.includes("titip sapi")) return "Titip Sapi";
-
-    return "Lainnya";
-  }
-
-  // 📦 Categorized groups
-  const categorizedGroups = $derived(
-    (() => {
-      const result: CategorizedData = {};
-
-      Object.entries(grouped).forEach(([groupId, items]) => {
-        items.forEach((item) => {
-          const category = getCategory(item.status);
-
-          if (!result[category]) result[category] = {};
-          if (!result[category][groupId]) result[category][groupId] = [];
-
-          result[category][groupId].push(item);
-        });
-      });
-
-      return result;
-    })(),
-  );
-
-  // 🔍 Filtered categories
-  const filteredCategories = $derived(
-    (() => {
-      const result: CategorizedData = {};
-
-      Object.entries(categorizedGroups).forEach(([category, groups]) => {
-        const filteredGroups = Object.entries(groups)
-          .map(([groupId, items]) => {
-            const filteredItems = items.filter((item) =>
-              item.name.toLowerCase().includes(query.toLowerCase()),
-            );
-
-            return [groupId, filteredItems] as [string, DataType[]];
-          })
-          .filter(([_, items]) => items.length > 0);
-
-        if (filteredGroups.length > 0) {
-          result[category] = Object.fromEntries(filteredGroups);
-        }
-      });
-
-      return result;
-    })(),
-  );
-
-  // ✅ Summary (Peserta, Sapi, Kambing)
-  const summary = $derived(
-    (() => {
-      let totalPeserta = 0;
-      let totalKambing = 0;
-
-      Object.values(grouped).forEach((items) => {
-        items.forEach((item) => {
-          totalPeserta++;
-
-          const status = item.status.toLowerCase();
-
-          if (status.includes("kambing")) {
-            totalKambing++;
-          }
-        });
-      });
-
-      // 🐂 total sapi = max group ID
-      const numericIds = Object.keys(grouped)
-        .filter((id) => !isNaN(Number(id)))
-        .map(Number);
-
-      const totalSapi = numericIds.length ? Math.max(...numericIds) : 0;
-
-      return {
-        totalPeserta,
-        totalSapi,
-        totalKambing,
-      };
-    })(),
-  );
-
-  // ✅ Max group ID (ignore "-")
-  const maxGroupId = $derived(
-    (() => {
-      const numericIds = Object.keys(grouped)
-        .filter((id) => !isNaN(Number(id)))
-        .map(Number);
-
-      return numericIds.length ? Math.max(...numericIds) : 0;
-    })(),
-  );
-
-  // 🎨 Category order
-  const categoryOrder = [
-    "Sapi Kolektif",
-    "Sapi Non-Kolektif",
-    "Titip Sapi",
-    "Titip Kambing",
-    "Lainnya",
-  ];
-
-  const sortedCategories = $derived(
-    (() => {
-      return Object.entries(filteredCategories).sort(
-        ([a], [b]) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b),
-      );
-    })(),
-  );
-
-  // 🐂 Merge all sapi into one grouped structure
-  const sapiGroups = $derived(
-    (() => {
-      const result: GroupedData = {};
-
-      Object.entries(grouped).forEach(([groupId, items]) => {
-        const sapiItems = items.filter((item) => item.status.toLowerCase().includes("sapi"));
-
-        if (sapiItems.length === 0) return;
-
-        result[groupId] = sapiItems;
-      });
-
-      return result;
-    })(),
-  );
-
-  const searchResults = $derived(
-    (() => {
-      if (!query.trim()) return [];
-
-      const result: {
-        name: string;
-        groupId: string;
-        info: string;
-        status: string;
-      }[] = [];
-
-      Object.entries(grouped).forEach(([groupId, items]) => {
-        const info = getGroupInfo(items);
-
-        items.forEach((item) => {
-          if (item.name.toLowerCase().includes(query.toLowerCase())) {
-            result.push({
-              name: item.name,
-              groupId,
-              info,
-              status: item.status,
-            });
-          }
-        });
-      });
-
-      return result;
-    })(),
-  );
-
-  // 🧠 Detect group info (label)
-  function getGroupInfo(items: DataType[]) {
-    const statuses = items.map((i) => i.status.toLowerCase());
-
-    if (statuses.some((s) => s.includes("non"))) return "(Non-Kolektif)";
-    if (statuses.some((s) => s.includes("kolektif"))) return "(Kolektif)";
-    if (statuses.some((s) => s.includes("titip"))) return "(Titip)";
-
-    return "";
-  }
-
-  // 🎨 Icons
-  const categoryIcon: Record<string, string> = {
-    "Sapi Kolektif": "🐂",
-    "Sapi Non-Kolektif": "🐄",
-    "Titip Sapi": "📦🐂",
-    "Titip Kambing": "📦🐐",
-    Lainnya: "📦",
+  const categoryLabel: Record<string, string> = {
+    Sapi: "🐂 Sapi",
+    Kambing: "🐐 Kambing",
   };
+
+  function focusInput() {
+    if (inputEl && heroEl) {
+      window.scrollTo({
+        top: heroEl.getBoundingClientRect().bottom,
+        behavior: "smooth",
+      });
+
+      inputEl.focus();
+    }
+  }
+
+  $effect(() => {
+    if (query) {
+      participant = filterByName(data.grouped, query);
+    } else {
+      participant = data.grouped;
+    }
+  });
 </script>
 
-<div class="flex justify-center">
-  <div class="flex flex-col gap-2 p-4 max-w-xl w-full">
-    <img alt="logo" src="/preview.png" class="w-3/5 m-auto mb-4" />
+<!-- Hero section start -->
+<div bind:this={heroEl} class="bg-hero relative w-full">
+  <div class="flex flex-col gap-5 p-6 max-w-xl mx-auto text-center text-white">
+    <!-- Logo -->
+    <img alt="logo" src="/logo_blank.svg" class="w-96 md:w-full mx-auto opacity-90" />
 
-    <h1 class="text-center font-bold text-xl mb-2">List pendaftaran hewan qurban 1447 H</h1>
+    <p class="text-center text-xs sm:text-md md:text-lg">
+      "Dan bagi tiap-tiap umat telah kami syariatkan penyembelihan (qurban) supaya mereka menyebut
+      nama Allah terhadap binatang ternak yang telah direzekikan Allah kepada mereka."
+      <br />
+      (QS. Al-Hajj: 34)
+    </p>
 
-    <!-- ✅ Summary -->
-    <span class="text-center font-semibold text-md mb-2">
-      Total peserta: {summary.totalPeserta} - {summary.totalSapi} Sapi, {summary.totalKambing} Kambing
-    </span>
-
-    <div>
-      <h2 class="font-bold mb-4">📝 Form Pendaftaran</h2>
-
-      <a href="https://forms.gle/7re1fWNqy3FsKVj39">
-        <button
-          class="mb-2 p-2 w-full border rounded-md hover:cursor-pointer bg-yellow-100 hover:bg-yellow-200 text-yellow-600"
-        >
-          Klik disini untuk daftar
-        </button>
-      </a>
+    <!-- CTA -->
+    <div class="flex flex-col w-full justify-center sm:flex-row gap-2">
+      <Button href="https://forms.gle/7re1fWNqy3FsKVj39">Klik Disini Untuk Mendaftar</Button>
+      <Button variant="outline" onclick={focusInput}>Lihat daftar peserta</Button>
     </div>
 
+    <!-- Summary -->
+    <div class="bg-white rounded-xl text-hero p-4">
+      <span class="text-md font-bold">Total Pendaftar hari ini, {date}</span>
+
+      <div class="mt-4 flex justify-evenly text-sm font-medium">
+        <div>
+          <p class="text-4xl font-bold">{summary.peserta}</p>
+          <p class="text-xl opacity-80">Peserta</p>
+        </div>
+
+        <div>
+          <p class="text-4xl font-bold">{summary.sapi}</p>
+          <p class="text-xl opacity-80">Sapi</p>
+        </div>
+
+        <div>
+          <p class="text-4xl font-bold">{summary.kambing}</p>
+          <p class="text-xl opacity-80">Kambing</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Hero section end -->
+
+<div class="relative flex justify-center">
+  <div class="flex flex-col gap-2 p-4 max-w-xl w-xl justify-center">
     <div class="mt-4">
       <h2 class="font-bold">📋 Daftar Peserta Qurban 1447H</h2>
       <!-- 🔍 Search -->
       <input
+        bind:this={inputEl}
         type="text"
         class="my-4 p-2 w-full border rounded-md"
         placeholder="Cari nama..."
         bind:value={query}
       />
 
-      {#if query.trim()}
-        <!-- 🔍 SEARCH MODE -->
-        <div class="mb-6">
-          <h2 class="font-bold text-lg mb-2">🔍 Hasil pencarian</h2>
+      <div class="mb-6">
+        {#each Object.entries(participant) as [category, value]}
+          {#each Object.entries(value) as [id, users]}
+            {@const isKambing = category.includes("Kambing")}
 
-          {#if searchResults.length === 0}
-            <p class="text-gray-500">Nama tidak ditemukan</p>
-          {:else}
-            <ul class="list-disc ml-2 space-y-2">
-              {#each searchResults as item}
-                <li>
-                  {item.name}
-
-                  <span class="ml-2 font-bold">
-                    {#if item.status.toLowerCase().includes("titip kambing")}
-                      (Titip Kambing)
-                    {:else if item.groupId !== "-"}
-                      (Sapi No. {item.groupId} - {item.info})
-                    {:else}
-                      (⏳ Menunggu konfirmasi nomor urut sapi...)
-                    {/if}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {:else}
-        <!-- 🧾 NORMAL MODE (your existing UI stays unchanged) -->
-
-        <!-- 🐂 SAPI (MERGED) -->
-        <div class="mb-6">
-          <h2 class="font-bold text-lg mb-2">🐂 Sapi</h2>
-
-          {#each Object.entries(sapiGroups) as [groupId, items]}
-            {@const info = getGroupInfo(items)}
             <div class="mb-4">
-              {#if groupId === "-"}
+              {#if !isKambing && id === "-"}
                 <h3 class="font-semibold text-gray-600">
                   ⏳ Menunggu konfirmasi nomor urut sapi...
                 </h3>
               {:else}
                 <h3 class="font-semibold">
-                  🐂 Sapi No. {groupId}
-                  {info}
+                  {categoryLabel[category] || "📦"}
+                  {!isKambing ? `No. ${id}` : ""}
                 </h3>
               {/if}
 
               <ul class="ml-2">
-                {#each items as item, i}
-                  <li>
-                    {groupId === "-" ? "" : i + 1} - {item.name}
+                {#each users as user, i}
+                  <li class="flex flex-wrap gap-2 items-center">
+                    {isKambing || id !== "-" ? i + 1 : ""} - {user.name}
+
+                    {#if user.payment === "Lunas"}
+                      <span>✅</span>
+                    {/if}
                   </li>
                 {/each}
               </ul>
             </div>
           {/each}
-        </div>
-
-        <!-- 🐐 OTHER CATEGORIES -->
-        {#each sortedCategories.filter(([category]) => !category
-              .toLowerCase()
-              .includes("sapi")) as [category, groups]}
-          {@const kambingList = Object.values(groups).flat()}
-
-          <div class="mb-6">
-            <h2 class="font-bold text-lg mb-2">
-              {categoryIcon[category] || "📦"}
-              {category}
-            </h2>
-
-            <ul class="ml-2 mb-4">
-              {#each kambingList as item, i}
-                <li>{i + 1} - {item.name}</li>
-              {/each}
-            </ul>
-          </div>
         {/each}
-      {/if}
+      </div>
     </div>
   </div>
+</div>
+
+<div class="bg-hero w-full py-1.5 flex justify-center items-center text-white text-xs">
+  Al-Ikhlash 2026 | Crafted by @septiandch
 </div>

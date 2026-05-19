@@ -48,10 +48,13 @@ export function getDate() {
 }
 
 export function getSummary(data: ApiData) {
+  const sapi_keys = Object.keys(data.grouped["Sapi"] || []);
+  const kambing_values = Object.values(data.grouped["Kambing"] || {});
+
   return {
     peserta: data.all.length,
-    sapi: Object.keys(data.grouped["Sapi"] || []).filter((key) => key !== "-")?.length,
-    kambing: Object.keys(data.grouped["Kambing"] || [])?.length,
+    sapi: sapi_keys.filter((key) => key !== "-")?.length,
+    kambing: kambing_values.reduce((total, arr) => total + arr.length, 0),
   };
 }
 
